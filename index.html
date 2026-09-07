@@ -17,19 +17,19 @@
             color: #fff;
             text-shadow: 
                 0 0 5px #fff,
-                0 0 10px #fff,
-                0 0 20px #0fa,
-                0 0 40px #0fa,
-                0 0 80px #0fa;
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 40px #00ffaa,
+                0 0 80px #00ffaa;
         }
         
         .food-text {
             color: #fff;
             text-shadow: 
                 0 0 5px #fff,
-                0 0 10px #f05,
-                0 0 20px #f05,
-                0 0 40px #f05;
+                0 0 10px #ff0077,
+                0 0 20px #ff0077,
+                0 0 40px #ff0077;
         }
 
         #game-over-screen {
@@ -87,8 +87,8 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050505);
-            scene.fog = new THREE.Fog(0x050505, 15, 40);
+            scene.background = new THREE.Color(0x0a0a16);
+            scene.fog = new THREE.Fog(0x0a0a16, 18, 45);
 
             // Camera setup (Isometric-ish perspective)
             const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -96,10 +96,10 @@
             camera.lookAt(0, 0, 0);
 
             // --- LIGHTING ---
-            const ambientLight = new THREE.AmbientLight(0x202030, 1.5);
+            const ambientLight = new THREE.AmbientLight(0x555588, 2.5);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xaaccff, 1.5);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
             dirLight.position.set(10, 20, 10);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 1024;
@@ -111,25 +111,24 @@
             scene.add(dirLight);
 
             // Food Light (Dynamic)
-            const foodLight = new THREE.PointLight(0xff0055, 3, 10);
+            const foodLight = new THREE.PointLight(0xff0077, 8, 15);
             scene.add(foodLight);
 
             // --- MATERIALS & GEOMETRIES ---
             const floorGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8, metalness: 0.2 });
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x16162a, roughness: 0.4, metalness: 0.5 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
             floor.rotation.x = -Math.PI / 2;
             floor.receiveShadow = true;
             scene.add(floor);
 
-            const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x00ffaa, 0x222222);
+            const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x00ffff, 0x008866);
             gridHelper.position.y = 0.01;
-            // gridHelper.material.opacity = 0.5;
             gridHelper.material.transparent = true;
             scene.add(gridHelper);
 
             const borderGeo = new THREE.BoxGeometry(GRID_SIZE + 1, 1, 0.5);
-            const borderMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8, roughness: 0.2 });
+            const borderMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x006688, emissiveIntensity: 0.6, metalness: 0.9, roughness: 0.1 });
             
             // Build Borders
             const borders = [
@@ -148,18 +147,18 @@
                 scene.add(wall);
             });
 
-            const snakeHeadMat = new THREE.MeshStandardMaterial({ color: 0x00ffaa, emissive: 0x004422, metalness: 0.5, roughness: 0.2 });
-            const snakeBodyMat = new THREE.MeshStandardMaterial({ color: 0x00cc88, metalness: 0.3, roughness: 0.4 });
+            const snakeHeadMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffaa, emissiveIntensity: 0.8, metalness: 0.2, roughness: 0.1 });
+            const snakeBodyMat = new THREE.MeshStandardMaterial({ color: 0x00ff66, emissive: 0x00aa44, emissiveIntensity: 0.4, metalness: 0.3, roughness: 0.2 });
             const snakeGeo = new THREE.BoxGeometry(0.85, 0.85, 0.85);
 
             const foodGeo = new THREE.SphereGeometry(0.4, 16, 16);
-            const foodMat = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.5 });
+            const foodMat = new THREE.MeshStandardMaterial({ color: 0xff0077, emissive: 0xff0066, emissiveIntensity: 1.5 });
             const foodMesh = new THREE.Mesh(foodGeo, foodMat);
             foodMesh.castShadow = true;
             scene.add(foodMesh);
 
             const obstacleGeo = new THREE.BoxGeometry(0.9, 1.5, 0.9);
-            const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x444455, metalness: 0.9, roughness: 0.1 });
+            const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xbd00ff, emissive: 0x6600aa, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.1 });
             let obstacleMeshes = [];
 
             // --- GAME STATE ---
@@ -448,7 +447,7 @@
                 
                 // Animate food hovering and pulsing
                 foodMesh.position.y = 0.4 + Math.sin(time * 0.005) * 0.1;
-                foodLight.intensity = THREE.MathUtils.lerp(foodLight.intensity, 3, 0.05);
+                foodLight.intensity = THREE.MathUtils.lerp(foodLight.intensity, 6, 0.05);
 
                 renderer.render(scene, camera);
             }
