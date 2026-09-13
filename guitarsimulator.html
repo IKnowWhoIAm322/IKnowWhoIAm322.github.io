@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guitar Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+            overflow-x: hidden;
+            touch-action: pan-y; /* Prevent scrolling when playing */
+        }
+
+        .fretboard-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            background: linear-gradient(to right, #4a3018, #2a1a0c);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 2px 10px rgba(255,255,255,0.1);
+            overflow: hidden;
+            padding: 20px 0;
+            border: 2px solid #5c3a21;
+        }
+
+        .fretboard {
+            display: flex;
+            position: relative;
+            padding-left: 60px; /* Space for the nut */
+        }
+
+        .nut {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 60px;
+            background: linear-gradient(to right, #d4d4d4, #f5f5f5);
+            border-right: 4px solid #111;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        .open-string-hitbox {
+            height: calc(100% / 6);
+            width: 100%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #333;
+            transition: background-color 0.2s;
+        }
+        
+        .open-string-hitbox:hover, .open-string-hitbox:active {
+            background-color: rgba(0,0,0,0.1);
+        }
+
+        .fret {
+            flex: 1;
+            border-right: 3px solid #b8b8b8;
+            box-shadow: inset -2px 0 2px rgba(0,0,0,0.4);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 50px;
+        }
+
+        /* Fret markers (dots) */
+        .fret:nth-child(3)::after,
+        .fret:nth-child(5)::after,
+        .fret:nth-child(7)::after,
+        .fret:nth-child(9)::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background-color: #e5e5e5;
+            border-radius: 50%;
+            opacity: 0.7;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .fret:nth-child(12)::before,
+        .fret:nth-child(12)::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 16px;
+            background-color: #e5e5e5;
+            border-radius: 50%;
+            opacity: 0.7;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .fret:nth-child(12)::before { top: 25%; }
+        .fret:nth-child(12)::after { top: 75%; transform: translate(-50%, -100%); } /* Adjust bottom dot */
+
+        .string-visuals {
+            position: absolute;
+            top: 20px; /* Match padding of container */
+            bottom: 20px;
+            left: 60px; /* Start after nut */
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            pointer-events: none; /* Let clicks pass through to hitboxes */
+            z-index: 5;
+        }
+
+        .string-visual {
+            width: 100%;
+            background: linear-gradient(to bottom, #ccc, #fff, #999);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            transition: transform 0.05s ease-out;
+        }
+
+        /* Thicker strings for lower notes */
+        .string-visual:nth-child(6) { height: 4px; } /* Low E */
+        .string-visual:nth-child(5) { height: 3.5px; } /* A */
+        .string-visual:nth-child(4) { height: 3px; } /* D */
+        .string-visual:nth-child(3) { height: 2.5px; } /* G */
+        .string-visual:nth-child(2) { height: 2px; } /* B */
+        .string-visual:nth-child(1) { height: 1.5px; } /* High e */
+
+        /* Animation class for playing string */
+        .string-playing {
+            animation: vibrate 0.2s linear infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(-2px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(2px); }
+            100% { transform: translateY(0); }
+        }
+
+        .note-hitbox {
+            flex: 1;
+            position: relative;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* Visual indicator for pressed note */
+        .note-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 24px;
+            height: 24px;
+            background-color: #3b82f6; /* Tailwind blue-500 */
+            border-radius: 50%;
+            opacity: 0;
+            transition: all 0.1s;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+        }
+
+        .note-hitbox.active .note-marker {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 0.8;
+        }
+        
+        .note-hitbox:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        /* Strum Area Styling */
+        .strum-area {
+            height: 200px;
+            background: linear-gradient(135deg, #2d3748, #1a202c);
+            border-radius: 12px;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #4a5568;
+            cursor: crosshair;
+        }
+
+        .strum-string {
+            height: calc(100% / 6);
+            width: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .strum-string::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #a0aec0, transparent);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        
+        /* Thickness for strum strings */
+        .strum-string:nth-child(6)::before { height: 5px; }
+        .strum-string:nth-child(5)::before { height: 4px; }
+        .strum-string:nth-child(4)::before { height: 3px; }
+        .strum-string:nth-child(3)::before { height: 2px; }
+        .strum-string:nth-child(2)::before { height: 1.5px; }
+        .strum-string:nth-child(1)::before { height: 1px; }
+
+        .strum-string.strummed::before {
+            animation: vibrateStrum 0.3s ease-out;
+        }
+
+        @keyframes vibrateStrum {
+            0% { transform: translateY(0); }
+            20% { transform: translateY(-4px); }
+            40% { transform: translateY(3px); }
+            60% { transform: translateY(-2px); }
+            80% { transform: translateY(1px); }
+            100% { transform: translateY(0); }
+        }
+
+        #volume-control {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 4px;
+            outline: none;
+        }
+        
+        #volume-control::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+        
+        /* Modal for initial interaction */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <div id="start-overlay" class="flex flex-col items-center">
+        <h1 class="text-4xl font-bold mb-6 text-white text-center">Web Guitar Simulator</h1>
+        <p class="mb-8 text-gray-400 text-center max-w-md">Click anywhere or press the button to enable audio and start playing.</p>
+        <button id="start-btn" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-xl transition shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+            Start Playing
+        </button>
+    </div>
+
+    <div class="w-full max-w-5xl mx-auto flex flex-col gap-6 opacity-0 transition-opacity duration-500" id="main-content">
+        
+        <header class="text-center mb-4">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">Virtual Guitar</h1>
+            <p class="text-gray-400 text-sm md:text-base">Tap frets to play notes, or swipe across the strum area.</p>
+        </header>
+
+        <div class="bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <i class="fas fa-volume-up text-gray-400 w-6"></i>
+                <input type="range" id="volume-control" min="0" max="1" step="0.05" value="0.7" class="w-32 md:w-48">
+            </div>
+            
+            <div class="flex gap-2">
+                <button id="clear-btn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">
+                    <i class="fas fa-eraser mr-2"></i>Clear Held Notes
+                </button>
+                <div class="px-4 py-2 bg-gray-900 rounded text-sm text-green-400 border border-gray-700 font-mono" id="current-note">
+                    Ready
+                </div>
+            </div>
+        </div>
+
+        <div class="fretboard-container select-none">
+            
+            <div class="nut" id="nut">
+                <!-- Open string hitboxes generated by JS -->
+            </div>
+            
+            <div class="string-visuals" id="string-visuals">
+                <!-- 6 strings -->
+                <div class="string-visual"></div>
+                <div class="string-visual"></div>
+                <div class="string-visual"></div>
+                <div class="string-visual"></div>
+                <div class="string-visual"></div>
+                <div class="string-visual"></div>
+            </div>
+
+            <div class="fretboard" id="fretboard">
+                <!-- Frets generated by JS -->
+            </div>
+        </div>
+        
+        <div class="text-center text-xs text-gray-500 mt-[-10px] mb-2 flex justify-between px-16">
+            <span>Nut</span>
+            <span>3rd</span>
+            <span>5th</span>
+            <span>7th</span>
+            <span>9th</span>
+            <span>12th</span>
+            <span>15th</span>
+        </div>
+
+        <div class="mt-4">
+            <h3 class="text-xl font-semibold mb-2 text-gray-300">Strum Area</h3>
+            <p class="text-xs text-gray-500 mb-2">Swipe across strings to strum held notes or open strings.</p>
+            <div class="strum-area" id="strum-area">
+                <!-- Strum lines generated by JS -->
+            </div>
+        </div>
+        
+        <div class="mt-8 text-center text-gray-500 text-sm max-w-2xl mx-auto">
+            <p><strong>How to play:</strong> Click/tap a fret to hold a note. It plays automatically. Tap again to release. Swipe vertically over the Strum Area to play all strings.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Constants ---
+        const NUM_FRETS = 15;
+        const NUM_STRINGS = 6;
+        
+        // Standard tuning: E2, A2, D3, G3, B3, E4
+        // Array corresponds to strings 6 (Low E) to 1 (High e)
+        const STRING_TUNING_MIDI = [40, 45, 50, 55, 59, 64]; 
+        
+        const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+        // State
+        let audioCtx;
+        let masterGain;
+        let isAudioInitialized = false;
+        
+        // Array to track which fret is held on each string. -1 means open string.
+        let heldFrets = [-1, -1, -1, -1, -1, -1]; 
+        // Track currently playing oscillators to stop them if needed
+        let activeVoices = [null, null, null, null, null, null];
+
+        // UI Elements
+        const fretboardEl = document.getElementById('fretboard');
+        const nutEl = document.getElementById('nut');
+        const stringVisualsEl = document.getElementById('string-visuals').children;
+        const strumAreaEl = document.getElementById('strum-area');
+        const currentNoteDisplay = document.getElementById('current-note');
+        const startOverlay = document.getElementById('start-overlay');
+        const mainContent = document.getElementById('main-content');
+
+        // --- Utility Functions ---
+        
+        // Convert MIDI note number to frequency
+        function midiToFreq(midiNote) {
+            return 440 * Math.pow(2, (midiNote - 69) / 12);
+        }
+
+        // Get note name string from MIDI note
+        function getNoteName(midiNote) {
+            const octave = Math.floor(midiNote / 12) - 1;
+            const noteName = NOTE_NAMES[midiNote % 12];
+            return `${noteName}${octave}`;
+        }
+
+        // --- Audio Synthesis (Karplus-Strong approximation via simple Web Audio) ---
+        function initAudio() {
+            if (isAudioInitialized) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            masterGain = audioCtx.createGain();
+            masterGain.connect(audioCtx.destination);
+            
+            const volumeControl = document.getElementById('volume-control');
+            masterGain.gain.value = volumeControl.value;
+            
+            volumeControl.addEventListener('input', (e) => {
+                masterGain.gain.value = e.target.value;
+            });
+
+            isAudioInitialized = true;
+        }
+
+        // Function to pluck a string
+        function pluckString(stringIndex, fretIndex) {
+            if (!isAudioInitialized) return;
+
+            // Stop current sound on this string if playing
+            if (activeVoices[stringIndex]) {
+                try {
+                    activeVoices[stringIndex].oscillator.stop();
+                    activeVoices[stringIndex].gainNode.disconnect();
+                } catch(e) {}
+            }
+
+            // Calculate MIDI note: Open string tuning + fret offset
+            // Ensure fretIndex is treated as 0 for open string when playing
+            const effectiveFret = fretIndex === -1 ? 0 : fretIndex;
+            const midiNote = STRING_TUNING_MIDI[stringIndex] + effectiveFret;
+            const freq = midiToFreq(midiNote);
+            
+            currentNoteDisplay.textContent = getNoteName(midiNote);
+
+            // Create nodes
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            // Connect: osc -> filter -> gain -> master
+            osc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            // Sound Design: Sawtooth combined with a lowpass filter creates a basic string-like pluck
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            // Envelope (ADSR)
+            const attackTime = 0.01;
+            const decayTime = 1.5;
+            // Lower strings decay slower
+            const sustainTime = 2.0 + (5 - stringIndex) * 0.5; 
+            
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + attackTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + attackTime + decayTime + sustainTime);
+
+            // Filter Envelope: Start bright, get duller quickly
+            filter.type = 'lowpass';
+            // Start frequency depends on note, higher notes = higher cutoff
+            const startCutoff = Math.min(freq * 8, 20000); 
+            filter.frequency.setValueAtTime(startCutoff, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(freq * 1.5, audioCtx.currentTime + 0.5);
+
+            // Play
+            osc.start();
+            // Stop to clean up memory
+            osc.stop(audioCtx.currentTime + attackTime + decayTime + sustainTime + 0.1);
+
+            // Save reference
+            activeVoices[stringIndex] = { oscillator: osc, gainNode: gainNode };
+
+            // Visual feedback
+            animateString(stringIndex);
+        }
+
+        function buildFretboard() {
+            // 1. Build Nut (Open Strings)
+            for (let s = 0; s < NUM_STRINGS; s++) {
+                const openHitbox = document.createElement('div');
+                openHitbox.className = 'open-string-hitbox';
+                openHitbox.textContent = NOTE_NAMES[STRING_TUNING_MIDI[s] % 12];
+                // Invert index: Top physical string is index 5 (High e), bottom is index 0 (Low E)
+                // Wait, standard visualization: Top string is High e (1st), Bottom is Low E (6th)
+                // Let's map s=0 to Low E, s=5 to High e.
+                // Visually: top div should be s=5, bottom div s=0
+                openHitbox.dataset.string = 5 - s; 
+                
+                openHitbox.addEventListener('mousedown', () => handleFretClick(5 - s, -1));
+                openHitbox.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    handleFretClick(5 - s, -1);
+                });
+                
+                nutEl.appendChild(openHitbox);
+            }
+
+            // 2. Build Frets
+            for (let f = 1; f <= NUM_FRETS; f++) {
+                const fretDiv = document.createElement('div');
+                fretDiv.className = 'fret';
+                
+                // Add strings for this fret
+                for (let s = 0; s < NUM_STRINGS; s++) {
+                    const stringIndex = 5 - s; // Top visual is High E (idx 5)
+                    const hitbox = document.createElement('div');
+                    hitbox.className = 'note-hitbox';
+                    hitbox.dataset.string = stringIndex;
+                    hitbox.dataset.fret = f;
+                    
+                    const marker = document.createElement('div');
+                    marker.className = 'note-marker';
+                    hitbox.appendChild(marker);
+
+                    const clickHandler = (e) => {
+                        if(e.type === 'touchstart') e.preventDefault();
+                        handleFretClick(stringIndex, f, hitbox);
+                    };
+
+                    hitbox.addEventListener('mousedown', clickHandler);
+                    hitbox.addEventListener('touchstart', clickHandler);
+
+                    fretDiv.appendChild(hitbox);
+                }
+                
+                fretboardEl.appendChild(fretDiv);
+            }
+        }
+
+        function handleFretClick(stringIndex, fretIndex, hitboxElement = null) {
+            if (!isAudioInitialized) return;
+
+            // Toggle logic: if clicking the already held fret, release it (set to open)
+            if (heldFrets[stringIndex] === fretIndex && fretIndex !== -1) {
+                heldFrets[stringIndex] = -1; // Revert to open string
+                updateVisualMarkers();
+            } else {
+                heldFrets[stringIndex] = fretIndex;
+                updateVisualMarkers();
+                // Play the note immediately upon fretting
+                pluckString(stringIndex, fretIndex);
+            }
+        }
+
+        function updateVisualMarkers() {
+            // Remove all active classes
+            document.querySelectorAll('.note-hitbox.active').forEach(el => el.classList.remove('active'));
+            
+            // Add active class to currently held frets
+            heldFrets.forEach((fret, stringIdx) => {
+                if (fret > 0) {
+                    // Find the specific hitbox
+                    // fret - 1 because nth-child is 1-based, but our loop creates them 1 to NUM_FRETS
+                    // stringIdx: we mapped s=0 (LowE) to bottom, s=5 (HighE) to top.
+                    // The DOM elements in each fret are appended top to bottom.
+                    const visualRowIndex = 5 - stringIdx; 
+                    
+                    const fretColumn = fretboardEl.children[fret - 1];
+                    if (fretColumn) {
+                        const hitbox = fretColumn.children[visualRowIndex];
+                        if (hitbox) {
+                            hitbox.classList.add('active');
+                        }
+                    }
+                }
+            });
+        }
+
+        function clearFrets() {
+            heldFrets = [-1, -1, -1, -1, -1, -1];
+            updateVisualMarkers();
+            currentNoteDisplay.textContent = 'Cleared';
+        }
+
+        function animateString(stringIndex) {
+            // Visual string is 0-indexed top-to-bottom.
+            // Our stringIndex is 0 (Low E) to 5 (High e).
+            // So visual index is 5 - stringIndex.
+            const visualElement = stringVisualsEl[5 - stringIndex];
+            if (visualElement) {
+                visualElement.classList.remove('string-playing');
+                // Trigger reflow
+                void visualElement.offsetWidth;
+                visualElement.classList.add('string-playing');
+                
+                // Remove class after animation
+                setTimeout(() => {
+                    visualElement.classList.remove('string-playing');
+                }, 200);
+            }
+        }
+
+        function buildStrumArea() {
+            for (let s = 0; s < NUM_STRINGS; s++) {
+                const strumString = document.createElement('div');
+                strumString.className = 'strum-string';
+                // Top string visually is 5 (High e), bottom is 0 (Low E)
+                const stringIndex = 5 - s; 
+                strumString.dataset.string = stringIndex;
+                
+                strumAreaEl.appendChild(strumString);
+            }
+
+            // Implement strumming logic via mouse/touch drag over the area
+            let isStrumming = false;
+            let lastStrummedString = -1;
+
+            const handleStrumMove = (clientY) => {
+                if (!isStrumming) return;
+                
+                const rect = strumAreaEl.getBoundingClientRect();
+                const relativeY = clientY - rect.top;
+                const stringHeight = rect.height / NUM_STRINGS;
+                
+                // Determine which visual string we are over (0 to 5, top to bottom)
+                const hoverVisualIndex = Math.floor(relativeY / stringHeight);
+                
+                if (hoverVisualIndex >= 0 && hoverVisualIndex < NUM_STRINGS) {
+                    const actualStringIndex = 5 - hoverVisualIndex;
+                    
+                    if (actualStringIndex !== lastStrummedString) {
+                        // Play the string based on its current held fret
+                        pluckString(actualStringIndex, heldFrets[actualStringIndex]);
+                        
+                        // Visual effect on strum area
+                        const strumLine = strumAreaEl.children[hoverVisualIndex];
+                        strumLine.classList.remove('strummed');
+                        void strumLine.offsetWidth;
+                        strumLine.classList.add('strummed');
+                        
+                        lastStrummedString = actualStringIndex;
+                    }
+                }
+            };
+
+            strumAreaEl.addEventListener('mousedown', (e) => {
+                isStrumming = true;
+                lastStrummedString = -1; // Reset to allow restumming same string if clicked directly
+                handleStrumMove(e.clientY);
+            });
+
+            window.addEventListener('mouseup', () => {
+                isStrumming = false;
+                lastStrummedString = -1;
+            });
+
+            strumAreaEl.addEventListener('mousemove', (e) => {
+                handleStrumMove(e.clientY);
+            });
+            
+            // Touch support for strumming
+            strumAreaEl.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scrolling
+                isStrumming = true;
+                lastStrummedString = -1;
+                handleStrumMove(e.touches[0].clientY);
+            });
+            
+            window.addEventListener('touchend', () => {
+                isStrumming = false;
+                lastStrummedString = -1;
+            });
+            
+            strumAreaEl.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                handleStrumMove(e.touches[0].clientY);
+            });
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            initAudio();
+            startOverlay.style.display = 'none';
+            mainContent.classList.remove('opacity-0');
+            
+            // Ensure audio context is running (fixes Safari auto-play policy)
+            if(audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        });
+
+        document.getElementById('clear-btn').addEventListener('click', clearFrets);
+
+        // Build UI on load
+        buildFretboard();
+        buildStrumArea();
+
+    </script>
+</body>
+</html>
